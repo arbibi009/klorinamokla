@@ -252,7 +252,7 @@ input[type="text"]::placeholder {
     transform: translateY(-50%);
     width: 20px;
     height: 20px;
-    
+    z-index: 2;
 }
 
 /* Overriding input padding for icon */
