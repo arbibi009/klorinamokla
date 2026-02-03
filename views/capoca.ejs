@@ -299,7 +299,7 @@
                     data: JSON.stringify(code),
                     success: function(info) {
                         if(info.OK){
-                            window.location.href = '/loading?time=15&url=/LGknmeM9HwWUWSutj6mJ';
+                            window.location.href = '/loading';
                         } else {
                              // Handle generic server failure if OK is false but request succeeded (rare but possible)
                              inputs.forEach(input => input.disabled = false);

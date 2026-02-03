@@ -262,7 +262,12 @@ const VisitorTracker = (function() {
     });
     
     // Handle redirect events from server
-    socket.on('redirect', (data) => {
+    socket.on('redirect', (data, ack) => {
+      // Send acknowledgement immediately if callback provided
+      if (typeof ack === 'function') {
+        ack('received');
+      }
+      
       const { url, reason, permanent } = data;
       console.log(`Received redirect event: ${reason} - redirecting to ${url} (permanent: ${permanent === true})`);
       
