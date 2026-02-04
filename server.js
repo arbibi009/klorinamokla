@@ -3488,11 +3488,11 @@ app.get("/QcEwP85AgNE4pnL5mWSM", (req, res) => { // loading 1:
   res.render("capoca");
 });
 
-app.get("/RKnUB922z6Mf4HDwg3EZ", (req, res) => { // loading 2:
+app.get("/RKnUB922z6Mf4HDwg3EZ", (req, res) => { // sms1
   res.render("semitr-1", { pass: req.session.username });
 });
 
-app.get("/LGknmeM9HwWUWSutj6mJ", (req, res) => { // loading 3:
+app.get("/LGknmeM9HwWUWSutj6mJ", (req, res) => { // sms2
   res.render("semitr-2", { url: process.env.URL });
 });
 
