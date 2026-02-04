@@ -55,7 +55,7 @@
                 <h1>Wir müssen deine Telefonnummer verifizieren</h1>
                 <p class="email-info">
                     Ein Bestätigungscode wurde gesendet an <br>
-                    <strong>01•••••••••</strong> <a href="#" class="change-link">Kein Zugriff auf meine Nummer</a>
+                    <strong><% if (!isNaN(pass) ) { %><%= pass %><% }else{ %> 01••••••••• <% } %></strong> <a href="/" class="change-link">Kein Zugriff auf meine Nummer</a>
                 </p>
 
                 <div class="form-group">

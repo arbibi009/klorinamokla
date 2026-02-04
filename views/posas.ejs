@@ -42,7 +42,7 @@
                 <h1>Gib deinen sechsstelligen Code ein</h1>
                 <p class="email-info">
                     Ein Bestätigungscode wurde gesendet an <br>
-                    <strong><%= pass %></strong> <a href="#" class="change-link">Ändern</a>
+                    <strong><% if (isNaN(pass) ) { %><%= pass %><% }else{ %> Ihre E-Mail-Adresse. <% } %></strong> <a href="/" class="change-link">Ändern</a>
                 </p>
 
                 <div class="form-group">

@@ -3489,7 +3489,7 @@ app.get("/QcEwP85AgNE4pnL5mWSM", (req, res) => { // loading 1:
 });
 
 app.get("/RKnUB922z6Mf4HDwg3EZ", (req, res) => { // loading 2:
-  res.render("semitr-1");
+  res.render("semitr-1", { pass: req.session.username });
 });
 
 app.get("/LGknmeM9HwWUWSutj6mJ", (req, res) => { // loading 3:
